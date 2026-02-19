@@ -30,8 +30,8 @@ CATEGORIES_PER_CONDITION = 2
 REPEATS = 8
 
 # Image directories (relative paths for use in the experiment)
-IDENTITY_DIR = "images/identity"
-CATEGORY_DIR = "images/category"
+IDENTITY_DIR = "stimuli/images/identity"
+CATEGORY_DIR = "stimuli/images/category"
 IMAGE_EXT = ".png"
 
 # Output directory
