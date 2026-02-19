@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Image Matching Task</title>
+
+  <!-- jsPsych core -->
+  <script src="https://unpkg.com/jspsych@7.3.4/jspsych.js"></script>
+  <link  href="https://unpkg.com/jspsych@7.3.4/css/jspsych.css" rel="stylesheet"/>
+
+  <!-- jsPsych plugins -->
+  <script src="https://unpkg.com/@jspsych/plugin-html-keyboard-response@1.1.3/dist/index.browser.min.js"></script>
+  <script src="https://unpkg.com/@jspsych/plugin-html-button-response@1.1.3/dist/index.browser.min.js"></script>
+  <script src="https://unpkg.com/@jspsych/plugin-preload@1.1.3/dist/index.browser.min.js"></script>
+  <script src="https://unpkg.com/@jspsych/plugin-audio-keyboard-response@1.1.3/dist/index.browser.min.js"></script>
+  <script src="https://unpkg.com/@jspsych/plugin-call-function@1.0.2/dist/index.browser.min.js"></script>
+
+  <!-- DataPipe (pipe data to OSF) -->
+  <script src="https://pipe.jspsych.org/api/data/jspsych.js"></script>
+
+  <!-- Experiment logic -->
+  <script src="experiment.js" defer></script>
+
+  <style>
+    /* ── Base ─────────────────────────────────────────── */
+    body {
+      background-color: #1a1a1a;
+      color: #e8e8e8;
+      font-family: 'Courier New', monospace;
+    }
+
+    .jspsych-content-wrapper {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* ── Fixation cross ───────────────────────────────── */
+    #fixation {
+      font-size: 48px;
+      font-weight: bold;
+      color: #e8e8e8;
+      line-height: 1;
+    }
+
+    /* ── Stimulus display ─────────────────────────────── */
+    .stimulus-container {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 60px;
+    }
+
+    /* Placeholder rectangle (shown before images appear) */
+    .img-placeholder {
+      width: 276px;
+      height: 276px;
+      border: 2px solid #555;
+      background-color: #2a2a2a;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 4px;
+    }
+
+    /* Image wrapper (same size as placeholder) */
+    .img-wrapper {
+      width: 276px;
+      height: 276px;
+      border: 2px solid #555;
+      background-color: #2a2a2a;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 4px;
+    }
+
+    .img-wrapper img {
+      width: 256px;
+      height: 256px;
+      object-fit: contain;
+      display: block;
+    }
+
+    /* ── Response instructions ────────────────────────── */
+    .response-hint {
+      margin-top: 36px;
+      font-size: 14px;
+      color: #888;
+      letter-spacing: 0.08em;
+      text-align: center;
+    }
+
+    .key-label {
+      display: inline-block;
+      background: #333;
+      border: 1px solid #555;
+      border-radius: 3px;
+      padding: 2px 8px;
+      font-size: 13px;
+      color: #ccc;
+      margin: 0 2px;
+    }
+
+    /* ── Instructions / debrief pages ────────────────── */
+    .instructions-box {
+      max-width: 640px;
+      text-align: left;
+      line-height: 1.7;
+      font-size: 16px;
+    }
+
+    .instructions-box h2 {
+      text-align: center;
+      letter-spacing: 0.12em;
+      font-size: 20px;
+      margin-bottom: 24px;
+      color: #fff;
+    }
+
+    .instructions-box p {
+      margin-bottom: 14px;
+      color: #ccc;
+    }
+
+    .instructions-box .key-demo {
+      text-align: center;
+      margin: 24px 0;
+      font-size: 18px;
+    }
+
+    .continue-prompt {
+      text-align: center;
+      margin-top: 32px;
+      color: #777;
+      font-size: 13px;
+      letter-spacing: 0.06em;
+    }
+  </style>
+</head>
+<body></body>
+</html>
