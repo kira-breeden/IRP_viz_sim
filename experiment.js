@@ -190,19 +190,18 @@ function buildTimeline(jsPsych, trials, participantId, seed) {
 
 
   // ── 5. DEBRIEF & SAVE ──────────────────────────────────────────────────────
+  // Build the CSV string into a closure variable so jsPsychPipe can reference it.
+  const OUTPUT_COLUMNS = [
+    'subjCode', 'rnd_seed', 'trial_num',
+    'image1', 'image2',
+    'trial_type', 'category',
+    'match_key', 'response', 'rt', 'correct'
+  ];
+  let _csvToSave = '';
+
   timeline.push({
     type: jsPsychCallFunction,
-    async: true,
-    func: async (done) => {
-      const filename = `${participantId}_seed${seed}.csv`;
-
-      // Build CSV with exactly the desired columns (main trials only)
-      const OUTPUT_COLUMNS = [
-        'subjCode', 'rnd_seed', 'trial_num',
-        'image1', 'image2',
-        'trial_type', 'category',
-        'match_key', 'response', 'rt', 'correct'
-      ];
+    func: () => {
       const mainTrials = jsPsych.data.get()
                            .filter({ task: "main_response", is_practice: false })
                            .values();
@@ -210,15 +209,16 @@ function buildTimeline(jsPsych, trials, participantId, seed) {
       const rows   = mainTrials.map(t =>
         OUTPUT_COLUMNS.map(col => t[col] ?? '').join(',')
       );
-      const csvData = [header, ...rows].join('\n');
-
-      try {
-        await DataPipe.save(DATAPIPE_EXPERIMENT_ID, filename, csvData);
-      } catch (err) {
-        console.warn("DataPipe save failed:", err);
-      }
-      done();
+      _csvToSave = [header, ...rows].join('\n');
     }
+  });
+
+  timeline.push({
+    type: jsPsychPipe,
+    action: "save",
+    experiment_id: DATAPIPE_EXPERIMENT_ID,
+    filename: `${participantId}_seed${seed}.csv`,
+    data_string: () => _csvToSave
   });
 
   timeline.push({
@@ -306,19 +306,17 @@ function makeTrialSequence(jsPsych, trialData, isPractice, trialNum) {
   });
 
   // 4. Feedback (audio on incorrect only)
+  // Wrapped in a timeline node so conditional_function works correctly in jsPsych v7
+  // and the audio trial is skipped entirely (not just rushed) when the answer is correct.
   seq.push({
-    type: jsPsychAudioKeyboardResponse,
-    stimulus: FEEDBACK_AUDIO,
-    choices: "NO_KEYS",
-    trial_ends_after_audio: true,
-    response_allowed_while_playing: false,
-    conditional_function: () => responseCorrect === false,
-    on_start: (trial) => {
-      if (responseCorrect !== false) {  // true (correct) or null (practice)
-        trial.trial_duration = 1;
-        trial.trial_ends_after_audio = false;
-      }
-    }
+    timeline: [{
+      type: jsPsychAudioKeyboardResponse,
+      stimulus: FEEDBACK_AUDIO,
+      choices: "NO_KEYS",
+      trial_ends_after_audio: true,
+      response_allowed_while_playing: false
+    }],
+    conditional_function: () => responseCorrect === false
   });
 
   // 5. ITI
