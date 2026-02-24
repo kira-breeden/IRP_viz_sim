@@ -1,15 +1,17 @@
 """
 Trial list generator for same/different image matching experiment.
-Generates two static CSV files:
+Generates three static CSV files:
 
   identity_trials.csv  — all identity "same" trials (every participant sees all of these)
   category_trials.csv  — all "different" trials for every category
+  practice_trials.csv  — full pool of practice pairs (same + different)
 
-At runtime, experiment.js uses a per-participant seed to randomly sample
-3 categories from category_trials.csv, then combines with identity_trials.csv
-and shuffles to produce that participant's trial order.
+At runtime, experiment.js uses a per-participant seed to:
+  - randomly sample 3 categories from category_trials.csv
+  - sample PRACTICE_TRIALS_PER_TYPE same and different trials from practice_trials.csv
 
 Per-participant trial counts (with 3 sampled categories):
+  Practice : PRACTICE_TRIALS_PER_TYPE × 2 (same + different)
   Identity : N_identity × REPEATS
   Category : 3 categories × 6 pairs × REPEATS
 """
@@ -25,6 +27,7 @@ REPEATS = 8
 # Image directories (relative paths for use in the experiment)
 IDENTITY_DIR = "stimuli/images/identity"
 CATEGORY_DIR = "stimuli/images/category"
+PRACTICE_DIR = "stimuli/images/practice"
 IMAGE_EXT = ".png"
 
 # Output directory
@@ -80,6 +83,50 @@ def make_category_trials(category_name):
     return trials
 
 
+def make_practice_trials():
+    """Generate the full pool of practice trial pairs.
+
+    Same trials  : each image paired with itself (N rows).
+    Diff trials  : every unique pairing of two different images (C(N,2) rows).
+    experiment.js samples PRACTICE_TRIALS_PER_TYPE of each at runtime using the seed.
+    """
+    images = sorted([
+        f"{PRACTICE_DIR}/{f}"
+        for f in os.listdir(PRACTICE_DIR)
+        if f.endswith(IMAGE_EXT)
+    ])
+    trials = []
+
+    # Same pairs
+    for img in images:
+        stem = os.path.basename(img).replace(IMAGE_EXT, "")
+        trials.append({
+            "trial_type": "same",
+            "category": "",
+            "pair": f"{stem}_vs_{stem}",
+            "left_image": img,
+            "right_image": img,
+            "correct_response": "same",
+            "randomize_lr": False
+        })
+
+    # Different pairs (all C(N,2) combinations)
+    for img_a, img_b in itertools.combinations(images, 2):
+        stem_a = os.path.basename(img_a).replace(IMAGE_EXT, "")
+        stem_b = os.path.basename(img_b).replace(IMAGE_EXT, "")
+        trials.append({
+            "trial_type": "different",
+            "category": "",
+            "pair": f"{stem_a}_vs_{stem_b}",
+            "left_image": img_a,
+            "right_image": img_b,
+            "correct_response": "different",
+            "randomize_lr": True
+        })
+
+    return trials
+
+
 def write_csv(trials, filepath):
     """Write trials to a CSV file."""
     if not trials:
@@ -107,29 +154,41 @@ def main():
     category_path = os.path.join(OUTPUT_DIR, "category_trials.csv")
     write_csv(category_trials, category_path)
 
+    # ── Practice trials (full pool; experiment JS samples 10+10 per participant)
+    practice_trials = make_practice_trials()
+    practice_path = os.path.join(OUTPUT_DIR, "practice_trials.csv")
+    write_csv(practice_trials, practice_path)
+    n_practice_same = sum(1 for t in practice_trials if t["correct_response"] == "same")
+    n_practice_diff = sum(1 for t in practice_trials if t["correct_response"] == "different")
+
     # ── Summary ────────────────────────────────────────────────────────────────
     print("=" * 50)
     print("TRIAL LIST GENERATION SUMMARY")
     print("=" * 50)
     print(f"Identity items    : {len(IDENTITY_ITEMS)}")
     print(f"Category items    : {len(CATEGORY_ITEMS)}")
+    print(f"Practice images   : {n_practice_same}")
     print(f"Repeats/comparison: {REPEATS}")
     print()
-    print(f"identity_trials.csv : {len(identity_trials)} trials")
+    print(f"identity_trials.csv  : {len(identity_trials)} trials")
     print(f"  ({len(IDENTITY_ITEMS)} items × {REPEATS} repeats)")
-    print(f"category_trials.csv : {len(category_trials)} trials total")
+    print(f"category_trials.csv  : {len(category_trials)} trials total")
     print(f"  ({len(CATEGORY_ITEMS)} categories × 6 pairs × {REPEATS} repeats)")
+    print(f"practice_trials.csv  : {len(practice_trials)} trials in pool")
+    print(f"  ({n_practice_same} same + {n_practice_diff} different)")
     print()
-    print("Per-participant at runtime (3 categories sampled by seed):")
+    print("Per-participant at runtime (seed-sampled):")
+    print(f"  Practice : 10 same + 10 different = 20")
     print(f"  Identity : {len(identity_trials)}")
     print(f"  Category : {3 * 6 * REPEATS}")
-    print(f"  Total    : {len(identity_trials) + 3 * 6 * REPEATS}")
+    print(f"  Total    : {20 + len(identity_trials) + 3 * 6 * REPEATS}")
     print()
     print(f"Saved: {identity_path}")
     print(f"Saved: {category_path}")
+    print(f"Saved: {practice_path}")
     print()
     print("NOTE: Item names are derived automatically from files in")
-    print(f"  {IDENTITY_DIR}/ and {CATEGORY_DIR}/")
+    print(f"  {IDENTITY_DIR}/, {CATEGORY_DIR}/, and {PRACTICE_DIR}/")
 
 
 if __name__ == "__main__":

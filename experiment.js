@@ -23,7 +23,8 @@
 const DATAPIPE_EXPERIMENT_ID = "2KZKOzOl6w2p";
 const TRIAL_LIST_DIR         = "trial_lists/";
 const FEEDBACK_AUDIO         = "stimuli/audio/buzz.wav";
-const CATEGORIES_PER_PARTICIPANT = 3;
+const CATEGORIES_PER_PARTICIPANT  = 3;
+const PRACTICE_TRIALS_PER_TYPE   = 10;  // same + different each
 // Response keys — ?response_key_config=1 swaps them
 const _keyConfig = parseInt(new URLSearchParams(window.location.search).get("response_key_config") || "0");
 const SAME_KEY   = _keyConfig === 1 ? "m" : "x";   // x=same by default
@@ -104,16 +105,23 @@ function collectImages(trials) {
 
 // ── BUILD TIMELINE ─────────────────────────────────────────────────────────────
 
-function buildTimeline(jsPsych, trials, participantId) {
+function buildTimeline(jsPsych, trials, practiceTrials, participantId) {
 
   const timeline = [];
 
   // ── 1. PRELOAD ──────────────────────────────────────────────────────────────
-  const allImages = collectImages(trials);
+  const allImages = collectImages([...trials, ...practiceTrials]);
+  const exampleImages = [
+    'stimuli/images/examples/drum1.jpg',
+    'stimuli/images/examples/flute1.jpg',
+    'stimuli/images/examples/cucumber8.jpg',
+    'stimuli/images/examples/lemon1.jpg',
+    'stimuli/images/examples/lemon3.jpg'
+  ];
 
   timeline.push({
     type: jsPsychPreload,
-    images: allImages,
+    images: [...allImages, ...exampleImages],
     audio: [FEEDBACK_AUDIO],
     show_detailed_errors: true
   });
@@ -137,29 +145,71 @@ function buildTimeline(jsPsych, trials, participantId) {
            Respond as fast as you can without sacrificing accuracy.</p>
         <p>If you make an error, you will hear a brief audio tone.</p>
         <p>Each trial begins with a <strong>+</strong> fixation cross. Focus on this cross before the images appear.</p>
-        <div class="continue-prompt">Press any key to begin a short practice block.</div>
+        <div class="continue-prompt">Press any key to see some examples.</div>
       </div>`,
     choices: "ALL_KEYS"
   });
 
 
-  // ── 3. PRACTICE TRIALS ─────────────────────────────────────────────────────
-  // 4 hand-crafted practice trials using actual stimuli (already preloaded).
-  const practiceTrials = [
-    { left_image: trials.find(t => t.trial_type === "identity").left_image,
-      right_image: trials.find(t => t.trial_type === "identity").left_image,
-      correct_response: "same" },
-    { left_image: trials.find(t => t.trial_type === "category")?.left_image || trials[0].left_image,
-      right_image: trials.find(t => t.trial_type === "category")?.right_image || trials[0].right_image,
-      correct_response: "different" },
-    { left_image: trials.find(t => t.trial_type === "identity").left_image,
-      right_image: trials.find(t => t.trial_type === "identity").left_image,
-      correct_response: "same" },
-    { left_image: trials.find(t => t.trial_type === "category")?.left_image || trials[1].left_image,
-      right_image: trials.find(t => t.trial_type === "category")?.right_image || trials[1].right_image,
-      correct_response: "different" }
+  // ── 3. EXAMPLE PAGES ───────────────────────────────────────────────────────
+  // 3 sequential pages that accumulate: each reveals all prior examples + the new one.
+  const EXAMPLE_SPECS = [
+    {
+      leftImg:  'stimuli/images/examples/drum1.jpg',
+      rightImg: 'stimuli/images/examples/flute1.jpg',
+      label: 'different', key: DIFF_KEY
+    },
+    {
+      leftImg:  'stimuli/images/examples/cucumber8.jpg',
+      rightImg: 'stimuli/images/examples/cucumber8.jpg',
+      label: 'same', key: SAME_KEY
+    },
+    {
+      leftImg:  'stimuli/images/examples/lemon1.jpg',
+      rightImg: 'stimuli/images/examples/lemon3.jpg',
+      label: 'different', key: DIFF_KEY
+    }
   ];
 
+  function exampleRowHTML(ex, idx) {
+    const intro = idx === 0
+      ? 'For example, these two images are'
+      : 'These two images are';
+    return `
+      <div class="example-row">
+        <p class="example-intro">${intro} <strong>${ex.label}</strong>, so press
+           <span class="key-label">${ex.key.toUpperCase()}</span>.</p>
+        <div class="example-images">
+          <div class="example-img-wrapper">
+            <img src="${ex.leftImg}" alt="left example"/>
+          </div>
+          <div class="example-img-wrapper">
+            <img src="${ex.rightImg}" alt="right example"/>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  for (let i = 0; i < EXAMPLE_SPECS.length; i++) {
+    const shownSoFar = EXAMPLE_SPECS.slice(0, i + 1);
+    const isLast = i === EXAMPLE_SPECS.length - 1;
+    timeline.push({
+      type: jsPsychHtmlKeyboardResponse,
+      stimulus: `
+        <div class="instructions-box" style="max-width:760px;">
+          <h2>EXAMPLES</h2>
+          ${shownSoFar.map((ex, j) => exampleRowHTML(ex, j)).join('')}
+          <div class="continue-prompt">${isLast
+            ? 'Press any key to begin a short practice block.'
+            : 'Press any key to see the next example.'}</div>
+        </div>`,
+      choices: "ALL_KEYS"
+    });
+  }
+
+
+  // ── 4. PRACTICE TRIALS ─────────────────────────────────────────────────────
+  // 20 seed-sampled trials from practice_trials.csv (10 same + 10 different).
   practiceTrials.forEach(pt => {
     timeline.push(...makeTrialSequence(jsPsych, pt, true, null));
   });
@@ -176,20 +226,20 @@ function buildTimeline(jsPsych, trials, participantId) {
           &nbsp;&nbsp;&nbsp;&nbsp;
           <span class="key-label">${DIFF_KEY.toUpperCase()}</span> &nbsp;=&nbsp; DIFFERENT
         </div>
-        <p>There will be no further feedback during the main task.</p>
+        <p>There will be no further instructions during the main task. If you have questions, ask the researcher now. </p>
         <div class="continue-prompt">Press any key to start.</div>
       </div>`,
     choices: "ALL_KEYS"
   });
 
 
-  // ── 4. MAIN TRIALS ─────────────────────────────────────────────────────────
+  // ── 5. MAIN TRIALS ─────────────────────────────────────────────────────────
   trials.forEach((trial, i) => {
     timeline.push(...makeTrialSequence(jsPsych, trial, false, i + 1));
   });
 
 
-  // ── 5. DEBRIEF & SAVE ──────────────────────────────────────────────────────
+  // ── 6. DEBRIEF & SAVE ──────────────────────────────────────────────────────
   // Build the CSV string into a closure variable so jsPsychPipe can reference it.
   const OUTPUT_COLUMNS = [
     'subjCode', 'rnd_seed', 'trial_num',
@@ -340,17 +390,20 @@ window.addEventListener("load", async () => {
   const participantId = getSubjCode();
   const seed          = getSeed();
 
-  // Load both trial list CSVs in parallel
-  let identityTrials, allCategoryTrials;
+  // Load all three trial list CSVs in parallel
+  let identityTrials, allCategoryTrials, allPracticeTrials;
   try {
-    const [idResp, catResp] = await Promise.all([
+    const [idResp, catResp, pracResp] = await Promise.all([
       fetch(`${TRIAL_LIST_DIR}identity_trials.csv`),
-      fetch(`${TRIAL_LIST_DIR}category_trials.csv`)
+      fetch(`${TRIAL_LIST_DIR}category_trials.csv`),
+      fetch(`${TRIAL_LIST_DIR}practice_trials.csv`)
     ]);
-    if (!idResp.ok)  throw new Error(`identity_trials.csv: HTTP ${idResp.status}`);
-    if (!catResp.ok) throw new Error(`category_trials.csv: HTTP ${catResp.status}`);
+    if (!idResp.ok)   throw new Error(`identity_trials.csv: HTTP ${idResp.status}`);
+    if (!catResp.ok)  throw new Error(`category_trials.csv: HTTP ${catResp.status}`);
+    if (!pracResp.ok) throw new Error(`practice_trials.csv: HTTP ${pracResp.status}`);
     identityTrials    = parseCSV(await idResp.text());
     allCategoryTrials = parseCSV(await catResp.text());
+    allPracticeTrials = parseCSV(await pracResp.text());
   } catch (err) {
     document.body.innerHTML = `
       <div style="color:#ff6b6b; font-family:monospace; padding:40px; text-align:center;">
@@ -362,16 +415,24 @@ window.addEventListener("load", async () => {
     return;
   }
 
-  // Use seed to sample CATEGORIES_PER_PARTICIPANT categories, then filter trials
+  // Use seed to sample categories, practice trials, and shuffle — all reproducibly
   const rng = mulberry32(seed);
+
+  // Sample main trials
   const allCategories      = [...new Set(allCategoryTrials.map(t => t.category))];
   const selectedCategories = seededSample(allCategories, CATEGORIES_PER_PARTICIPANT, rng);
   const categoryTrials     = allCategoryTrials.filter(t => selectedCategories.includes(t.category));
-
-  // Combine identity + sampled category trials and shuffle with the same seed
   const devMode = new URLSearchParams(window.location.search).get("dev") === "true";
   let trials = seededShuffle([...identityTrials, ...categoryTrials], rng);
   if (devMode) trials = trials.slice(0, 10);
+
+  // Sample practice trials (10 same + 10 different, then shuffle)
+  const poolSame  = allPracticeTrials.filter(t => t.correct_response === "same");
+  const poolDiff  = allPracticeTrials.filter(t => t.correct_response === "different");
+  const practiceTrials = seededShuffle([
+    ...seededSample(poolSame, PRACTICE_TRIALS_PER_TYPE, rng),
+    ...seededSample(poolDiff, PRACTICE_TRIALS_PER_TYPE, rng)
+  ], rng);
 
   // Init jsPsych
   const jsPsych = initJsPsych({
@@ -390,6 +451,6 @@ window.addEventListener("load", async () => {
     response_key_config: _keyConfig
   });
 
-  const timeline = buildTimeline(jsPsych, trials, participantId);
+  const timeline = buildTimeline(jsPsych, trials, practiceTrials, participantId);
   jsPsych.run(timeline);
 });
