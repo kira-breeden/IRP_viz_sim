@@ -5,13 +5,13 @@
  * Trial flow per trial:
  *   1. Fixation cross (1000ms)
  *   2. Placeholder rectangles (500ms)
- *   3. Images appear; participant responds (f = same, j = different)
+ *   3. Images appear; participant responds (z = same, / = different)
  *   4. If incorrect: audio feedback plays
  *   5. ITI (750ms)
  *
  * URL parameters:
- *   ?condition=1              (1–5)  — determines which trial list CSV is loaded
  *   ?subjCode=P001            — participant identifier
+ *   ?seed=482910              — RNG seed for category sampling (random if omitted)
  *   ?response_key_config=0|1  — 0 (default): z=same, /=different; 1: swapped
  *
  * DataPipe config:
@@ -19,9 +19,10 @@
  */
 
 // ── CONFIG ────────────────────────────────────────────────────────────────────
-const DATAPIPE_EXPERIMENT_ID = "2KZKOzOl6w2p"; 
+const DATAPIPE_EXPERIMENT_ID = "2KZKOzOl6w2p";
 const TRIAL_LIST_DIR         = "trial_lists/";
-const FEEDBACK_AUDIO         = "stimuli/audio/buzz.wav";  
+const FEEDBACK_AUDIO         = "stimuli/audio/buzz.wav";
+const CATEGORIES_PER_PARTICIPANT = 3;
 // Response keys — ?response_key_config=1 swaps them
 const _keyConfig = parseInt(new URLSearchParams(window.location.search).get("response_key_config") || "0");
 const SAME_KEY   = _keyConfig === 1 ? "/" : "z";   // z=same by default
@@ -34,16 +35,42 @@ const ITI_DURATION           = 750;    // ms
 
 // ── UTILITIES ─────────────────────────────────────────────────────────────────
 
-/** Read URL param ?condition=N (default 1) */
-function getCondition() {
-  const params = new URLSearchParams(window.location.search);
-  const c = parseInt(params.get("condition"));
-  return (isNaN(c) || c < 1 || c > 5) ? 1 : c;
-}
-
 /** Read participant ID from URL ?subjCode= */
 function getSubjCode() {
   return new URLSearchParams(window.location.search).get("subjCode") || "UNKNOWN";
+}
+
+/** Read RNG seed from URL ?seed=; generates a random one if omitted. */
+function getSeed() {
+  const s = new URLSearchParams(window.location.search).get("seed");
+  return s !== null ? parseInt(s) : Math.floor(Math.random() * 1e9);
+}
+
+/**
+ * Mulberry32 seeded PRNG. Returns a function that produces values in [0, 1).
+ * Using a seeded RNG makes category sampling fully reproducible from the seed.
+ */
+function mulberry32(seed) {
+  return function() {
+    seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+    let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+
+/** Fisher-Yates shuffle using a provided RNG function. Mutates and returns arr. */
+function seededShuffle(arr, rng) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+/** Randomly sample n items from arr using a provided RNG. Does not mutate arr. */
+function seededSample(arr, n, rng) {
+  return seededShuffle([...arr], rng).slice(0, n);
 }
 
 /** Parse a CSV string into an array of objects */
@@ -56,6 +83,11 @@ function parseCSV(text) {
     headers.forEach((h, i) => obj[h] = values[i]);
     return obj;
   });
+}
+
+/** Return just the filename stem (no path, no .png) from an image path. */
+function imageStem(path) {
+  return path.split('/').pop().replace(/\.png$/i, '');
 }
 
 /** Collect all unique image paths from the trial list for preloading */
@@ -71,7 +103,7 @@ function collectImages(trials) {
 
 // ── BUILD TIMELINE ─────────────────────────────────────────────────────────────
 
-function buildTimeline(jsPsych, trials, participantId, condition) {
+function buildTimeline(jsPsych, trials, participantId, seed) {
 
   const timeline = [];
 
@@ -94,7 +126,7 @@ function buildTimeline(jsPsych, trials, participantId, condition) {
         <h2>IMAGE MATCHING TASK</h2>
         <p>In this task, you will see <strong>two images</strong> appear side by side on the screen.</p>
         <p>Your job is to decide as quickly and accurately as possible whether the two images are
-           <strong>exactly the same image</strong> or <strong>different images</strong>.</p>
+           <strong>the same image</strong> or <strong>different images</strong>.</p>
         <div class="key-demo">
           <span class="key-label">${SAME_KEY.toUpperCase()}</span> &nbsp;=&nbsp; SAME
           &nbsp;&nbsp;&nbsp;&nbsp;
@@ -103,7 +135,7 @@ function buildTimeline(jsPsych, trials, participantId, condition) {
         <p>Please keep your fingers on these keys throughout the experiment.
            Respond as fast as you can without sacrificing accuracy.</p>
         <p>If you make an error, you will hear a brief audio tone.</p>
-        <p>Each trial begins with a <strong>+</strong> fixation cross. Focus on it before the images appear.</p>
+        <p>Each trial begins with a <strong>+</strong> fixation cross. Focus on this cross before the images appear.</p>
         <div class="continue-prompt">Press any key to begin a short practice block.</div>
       </div>`,
     choices: "ALL_KEYS"
@@ -111,9 +143,7 @@ function buildTimeline(jsPsych, trials, participantId, condition) {
 
 
   // ── 3. PRACTICE TRIALS ─────────────────────────────────────────────────────
-  // 4 hand-crafted practice trials using identity images (first 2 items).
-  // Same-same for identity items 1 and 2; different-different for two pairs.
-  // These use the actual stimuli so preloading covers them already.
+  // 4 hand-crafted practice trials using actual stimuli (already preloaded).
   const practiceTrials = [
     { left_image: trials.find(t => t.trial_type === "identity").left_image,
       right_image: trials.find(t => t.trial_type === "identity").left_image,
@@ -130,7 +160,7 @@ function buildTimeline(jsPsych, trials, participantId, condition) {
   ];
 
   practiceTrials.forEach(pt => {
-    timeline.push(...makeTrialSequence(jsPsych, pt, true));
+    timeline.push(...makeTrialSequence(jsPsych, pt, true, null));
   });
 
   timeline.push({
@@ -153,8 +183,8 @@ function buildTimeline(jsPsych, trials, participantId, condition) {
 
 
   // ── 4. MAIN TRIALS ─────────────────────────────────────────────────────────
-  trials.forEach(trial => {
-    timeline.push(...makeTrialSequence(jsPsych, trial, false));
+  trials.forEach((trial, i) => {
+    timeline.push(...makeTrialSequence(jsPsych, trial, false, i + 1));
   });
 
 
@@ -163,11 +193,24 @@ function buildTimeline(jsPsych, trials, participantId, condition) {
     type: jsPsychCallFunction,
     async: true,
     func: async (done) => {
-      // Save data to OSF via DataPipe
-      const filename = `${participantId}_condition${condition}.csv`;
-      const csvData  = jsPsych.data.get()
-                         .filter({ task: "main_response" })
-                         .csv();
+      const filename = `${participantId}_seed${seed}.csv`;
+
+      // Build CSV with exactly the desired columns (main trials only)
+      const OUTPUT_COLUMNS = [
+        'subjCode', 'rnd_seed', 'trial_num',
+        'image1', 'image2',
+        'trial_type', 'category',
+        'match_key', 'response', 'rt', 'correct'
+      ];
+      const mainTrials = jsPsych.data.get()
+                           .filter({ task: "main_response", is_practice: false })
+                           .values();
+      const header = OUTPUT_COLUMNS.join(',');
+      const rows   = mainTrials.map(t =>
+        OUTPUT_COLUMNS.map(col => t[col] ?? '').join(',')
+      );
+      const csvData = [header, ...rows].join('\n');
+
       try {
         await DataPipe.save(DATAPIPE_EXPERIMENT_ID, filename, csvData);
       } catch (err) {
@@ -197,7 +240,7 @@ function buildTimeline(jsPsych, trials, participantId, condition) {
  * Returns an array of jsPsych trial objects for one experimental trial:
  *   [fixation, placeholders, stimulus+response, (optional feedback), ITI]
  */
-function makeTrialSequence(jsPsych, trialData, isPractice) {
+function makeTrialSequence(jsPsych, trialData, isPractice, trialNum) {
   const seq = [];
   let responseCorrect = null; // shared across closure
 
@@ -243,23 +286,21 @@ function makeTrialSequence(jsPsych, trialData, isPractice) {
     choices: [SAME_KEY, DIFF_KEY],
     response_ends_trial: true,
     data: {
-      task: "main_response",
-      trial_type: trialData.trial_type    || null,
-      category:   trialData.category      || null,
-      pair:       trialData.pair          || null,
-      condition:  trialData.condition     || null,
-      trial_index: trialData.trial_index  || null,
-      left_image: trialData.left_image,
-      right_image: trialData.right_image,
+      task:             "main_response",
+      trial_num:        trialNum,
+      image1:           imageStem(trialData.left_image),
+      image2:           imageStem(trialData.right_image),
+      trial_type:       trialData.trial_type  || null,
+      category:         trialData.category    || null,
+      match_key:        SAME_KEY,
       correct_response: trialData.correct_response,
-      is_practice: isPractice
+      is_practice:      isPractice
     },
     on_finish: (data) => {
-      const keyPressed   = data.response;
-      const correctKey   = trialData.correct_response === "same" ? SAME_KEY : DIFF_KEY;
-      data.correct        = keyPressed === correctKey;
-      data.correct_key    = correctKey;
-      responseCorrect     = data.correct;
+      const keyPressed = data.response;
+      const correctKey = trialData.correct_response === "same" ? SAME_KEY : DIFF_KEY;
+      data.correct     = keyPressed === correctKey ? 1 : 0;
+      responseCorrect  = data.correct === 1;
     }
   });
 
@@ -270,11 +311,9 @@ function makeTrialSequence(jsPsych, trialData, isPractice) {
     choices: "NO_KEYS",
     trial_ends_after_audio: true,
     response_allowed_while_playing: false,
-    // Only play if the last response was incorrect
     conditional_function: () => responseCorrect === false,
     on_start: (trial) => {
-      // If correct, skip by setting a near-zero duration
-      if (responseCorrect !== false) {
+      if (responseCorrect !== false) {  // true (correct) or null (practice)
         trial.trial_duration = 1;
         trial.trial_ends_after_audio = false;
       }
@@ -296,28 +335,39 @@ function makeTrialSequence(jsPsych, trialData, isPractice) {
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
 window.addEventListener("load", async () => {
-  const condition     = getCondition();
   const participantId = getSubjCode();
-  const trialFile     = `${TRIAL_LIST_DIR}trials_condition_${condition}.csv`;
+  const seed          = getSeed();
 
-  // Load trial list
-  let trials;
+  // Load both trial list CSVs in parallel
+  let identityTrials, allCategoryTrials;
   try {
-    const resp = await fetch(trialFile);
-    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-    const text = await resp.text();
-    trials = parseCSV(text);
+    const [idResp, catResp] = await Promise.all([
+      fetch(`${TRIAL_LIST_DIR}identity_trials.csv`),
+      fetch(`${TRIAL_LIST_DIR}category_trials.csv`)
+    ]);
+    if (!idResp.ok)  throw new Error(`identity_trials.csv: HTTP ${idResp.status}`);
+    if (!catResp.ok) throw new Error(`category_trials.csv: HTTP ${catResp.status}`);
+    identityTrials    = parseCSV(await idResp.text());
+    allCategoryTrials = parseCSV(await catResp.text());
   } catch (err) {
     document.body.innerHTML = `
       <div style="color:#ff6b6b; font-family:monospace; padding:40px; text-align:center;">
         <h2>Error loading trial list</h2>
-        <p>Could not load: <code>${trialFile}</code></p>
         <p>${err.message}</p>
         <p>Make sure you have launched this experiment from a web server (not file://)
-           and that the trial list CSV exists.</p>
+           and that the trial list CSVs exist in <code>${TRIAL_LIST_DIR}</code>.</p>
       </div>`;
     return;
   }
+
+  // Use seed to sample CATEGORIES_PER_PARTICIPANT categories, then filter trials
+  const rng = mulberry32(seed);
+  const allCategories      = [...new Set(allCategoryTrials.map(t => t.category))];
+  const selectedCategories = seededSample(allCategories, CATEGORIES_PER_PARTICIPANT, rng);
+  const categoryTrials     = allCategoryTrials.filter(t => selectedCategories.includes(t.category));
+
+  // Combine identity + sampled category trials and shuffle with the same seed
+  const trials = seededShuffle([...identityTrials, ...categoryTrials], rng);
 
   // Init jsPsych
   const jsPsych = initJsPsych({
@@ -328,13 +378,14 @@ window.addEventListener("load", async () => {
     }
   });
 
-  // Add participant metadata to all trials
+  // Add participant metadata to every trial row
   jsPsych.data.addProperties({
-    participant_id:      participantId,
-    condition:           condition,
+    subjCode:            participantId,
+    rnd_seed:            seed,
+    selected_categories: selectedCategories.join("|"),
     response_key_config: _keyConfig
   });
 
-  const timeline = buildTimeline(jsPsych, trials, participantId, condition);
+  const timeline = buildTimeline(jsPsych, trials, participantId, seed);
   jsPsych.run(timeline);
 });
