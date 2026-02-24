@@ -163,6 +163,7 @@ function buildTimeline(jsPsych, trials, practiceTrials, participantId) {
         <p>Please keep your fingers on these keys throughout the experiment.
            Respond as fast as you can without sacrificing accuracy.</p>
         <p>If you make an error, you will hear a brief audio tone.</p>
+        <p>As you go through, please answer as quickly as you can, but if you are consistently making errors, slow down just a little.</p>
         <p>Each trial begins with a <strong>+</strong> fixation cross. Focus on this cross before the images appear.</p>
         <div class="continue-prompt">Press any key to see some examples.</div>
       </div>`,
@@ -192,7 +193,7 @@ function buildTimeline(jsPsych, trials, practiceTrials, participantId) {
 
   function exampleRowHTML(ex, idx, visible) {
     const intro = idx === 0
-      ? 'For example, these two images are'
+      ? 'These two images are'
       : 'These two images are';
     // visibility:hidden hides the row but preserves its space,
     // keeping every example in the same position across all three pages.
@@ -220,12 +221,31 @@ function buildTimeline(jsPsych, trials, practiceTrials, participantId) {
           <h2>EXAMPLES</h2>
           ${EXAMPLE_SPECS.map((ex, j) => exampleRowHTML(ex, j, j <= i)).join('')}
           <div class="continue-prompt">${isLast
-            ? 'Press any key to begin a short practice block.'
+            ? 'Press any key to continue.'
             : 'Press any key to see the next example.'}</div>
         </div>`,
       choices: "ALL_KEYS"
     });
   }
+
+  // Final Instructions Page
+    timeline.push({
+    type: jsPsychHtmlKeyboardResponse,
+    stimulus: `
+      <div class="instructions-box">
+        <h2>FINAL REMINDERS</h2>
+        <p>You will now start with a practice phase and will then move on to the remainder of the trials.</p>
+        <p>Decide as quickly and accurately as possible whether the two images are
+           <strong>the same image</strong> or <strong>different images</strong>.</p>
+        <div class="key-demo">
+          <span class="key-label">${SAME_KEY.toUpperCase()}</span> &nbsp;=&nbsp; SAME
+          &nbsp;&nbsp;&nbsp;&nbsp;
+          <span class="key-label">${DIFF_KEY.toUpperCase()}</span> &nbsp;=&nbsp; DIFFERENT
+        </div>
+        <div class="continue-prompt">If you have questions please ask the researcher. Please let the researcher know you have finished reading the instructions.</div>
+      </div>`,
+    choices: "q"
+  });
 
 
   // ── 4. PRACTICE TRIALS ─────────────────────────────────────────────────────
@@ -239,15 +259,15 @@ function buildTimeline(jsPsych, trials, practiceTrials, participantId) {
     stimulus: `
       <div class="instructions-box">
         <h2>PRACTICE COMPLETE</h2>
-        <p>Great! The real experiment is about to begin.</p>
+        <p>Great! You have completed the practice trials.</p>
         <p>Remember:</p>
         <div class="key-demo">
           <span class="key-label">${SAME_KEY.toUpperCase()}</span> &nbsp;=&nbsp; SAME
           &nbsp;&nbsp;&nbsp;&nbsp;
           <span class="key-label">${DIFF_KEY.toUpperCase()}</span> &nbsp;=&nbsp; DIFFERENT
         </div>
-        <p>There will be no further instructions during the main task. If you have questions, ask the researcher now. </p>
-        <div class="continue-prompt">Press any key to start.</div>
+        <p>There will be no further instructions during the main task. If you have questions, ask the researcher now BEFORE moving on. </p>
+        <div class="continue-prompt">When you are ready, press any key to start the task.</div>
       </div>`,
     choices: "ALL_KEYS"
   });
