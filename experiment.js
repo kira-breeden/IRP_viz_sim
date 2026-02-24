@@ -190,12 +190,14 @@ function buildTimeline(jsPsych, trials, practiceTrials, participantId) {
     }
   ];
 
-  function exampleRowHTML(ex, idx) {
+  function exampleRowHTML(ex, idx, visible) {
     const intro = idx === 0
       ? 'For example, these two images are'
       : 'These two images are';
+    // visibility:hidden hides the row but preserves its space,
+    // keeping every example in the same position across all three pages.
     return `
-      <div class="example-row">
+      <div class="example-row" style="visibility:${visible ? 'visible' : 'hidden'}">
         <p class="example-intro">${intro} <strong>${ex.label}</strong>, so press
            <span class="key-label">${ex.key.toUpperCase()}</span>.</p>
         <div class="example-images">
@@ -210,14 +212,13 @@ function buildTimeline(jsPsych, trials, practiceTrials, participantId) {
   }
 
   for (let i = 0; i < EXAMPLE_SPECS.length; i++) {
-    const shownSoFar = EXAMPLE_SPECS.slice(0, i + 1);
     const isLast = i === EXAMPLE_SPECS.length - 1;
     timeline.push({
       type: jsPsychHtmlKeyboardResponse,
       stimulus: `
         <div class="instructions-box" style="max-width:760px;">
           <h2>EXAMPLES</h2>
-          ${shownSoFar.map((ex, j) => exampleRowHTML(ex, j)).join('')}
+          ${EXAMPLE_SPECS.map((ex, j) => exampleRowHTML(ex, j, j <= i)).join('')}
           <div class="continue-prompt">${isLast
             ? 'Press any key to begin a short practice block.'
             : 'Press any key to see the next example.'}</div>
@@ -352,11 +353,6 @@ function makeTrialSequence(jsPsych, trialData, isPractice, trialNum) {
         <div class="img-wrapper">
           <img src="${rightImg}" alt="right image"/>
         </div>
-      </div>
-      <div class="response-hint">
-        <span class="key-label">${SAME_KEY.toUpperCase()}</span> same
-        &nbsp;&nbsp;&nbsp;
-        <span class="key-label">${DIFF_KEY.toUpperCase()}</span> different
       </div>`,
     choices: [SAME_KEY, DIFF_KEY],
     response_ends_trial: true,
