@@ -75,6 +75,25 @@ function seededSample(arr, n, rng) {
   return seededShuffle([...arr], rng).slice(0, n);
 }
 
+/**
+ * Greedy-sample up to n trials from pool such that no image appears more than
+ * once. usedImages is a Set of image paths already taken (shared across same +
+ * different pools so the two passes don't overlap). Mutates usedImages in place.
+ */
+function greedySampleUnique(pool, n, rng, usedImages) {
+  const shuffled = seededShuffle([...pool], rng);
+  const selected = [];
+  for (const trial of shuffled) {
+    if (selected.length >= n) break;
+    if (!usedImages.has(trial.left_image) && !usedImages.has(trial.right_image)) {
+      selected.push(trial);
+      usedImages.add(trial.left_image);
+      usedImages.add(trial.right_image);
+    }
+  }
+  return selected;
+}
+
 /** Parse a CSV string into an array of objects */
 function parseCSV(text) {
   const lines = text.trim().split("\n");
@@ -295,6 +314,11 @@ function makeTrialSequence(jsPsych, trialData, isPractice, trialNum) {
   const seq = [];
   let responseCorrect = null; // shared across closure
 
+  // Randomly swap left/right for trials where randomize_lr is set
+  const swap = trialData.randomize_lr === "True" && Math.random() < 0.5;
+  const leftImg  = swap ? trialData.right_image : trialData.left_image;
+  const rightImg = swap ? trialData.left_image  : trialData.right_image;
+
   // 1. Fixation
   seq.push({
     type: jsPsychHtmlKeyboardResponse,
@@ -323,10 +347,10 @@ function makeTrialSequence(jsPsych, trialData, isPractice, trialNum) {
     stimulus: () => `
       <div class="stimulus-container">
         <div class="img-wrapper">
-          <img src="${trialData.left_image}" alt="left image"/>
+          <img src="${leftImg}" alt="left image"/>
         </div>
         <div class="img-wrapper">
-          <img src="${trialData.right_image}" alt="right image"/>
+          <img src="${rightImg}" alt="right image"/>
         </div>
       </div>
       <div class="response-hint">
@@ -339,8 +363,8 @@ function makeTrialSequence(jsPsych, trialData, isPractice, trialNum) {
     data: {
       task:             "main_response",
       trial_num:        trialNum,
-      image1:           imageStem(trialData.left_image),
-      image2:           imageStem(trialData.right_image),
+      image1:           imageStem(leftImg),
+      image2:           imageStem(rightImg),
       trial_type:       trialData.trial_type  || null,
       category:         trialData.category    || null,
       match_key:        SAME_KEY,
@@ -427,11 +451,14 @@ window.addEventListener("load", async () => {
   if (devMode) trials = trials.slice(0, 10);
 
   // Sample practice trials (10 same + 10 different, then shuffle)
+  // Sample practice trials: pick same trials first, then different trials,
+  // using a shared usedImages set so no image appears in more than one trial.
   const poolSame  = allPracticeTrials.filter(t => t.correct_response === "same");
   const poolDiff  = allPracticeTrials.filter(t => t.correct_response === "different");
+  const usedPracticeImages = new Set();
   const practiceTrials = seededShuffle([
-    ...seededSample(poolSame, PRACTICE_TRIALS_PER_TYPE, rng),
-    ...seededSample(poolDiff, PRACTICE_TRIALS_PER_TYPE, rng)
+    ...greedySampleUnique(poolSame, PRACTICE_TRIALS_PER_TYPE, rng, usedPracticeImages),
+    ...greedySampleUnique(poolDiff, PRACTICE_TRIALS_PER_TYPE, rng, usedPracticeImages)
   ], rng);
 
   // Init jsPsych
