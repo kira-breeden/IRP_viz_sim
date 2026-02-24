@@ -104,7 +104,7 @@ function collectImages(trials) {
 
 // ── BUILD TIMELINE ─────────────────────────────────────────────────────────────
 
-function buildTimeline(jsPsych, trials, participantId, seed) {
+function buildTimeline(jsPsych, trials, participantId) {
 
   const timeline = [];
 
@@ -195,7 +195,7 @@ function buildTimeline(jsPsych, trials, participantId, seed) {
     'subjCode', 'rnd_seed', 'trial_num',
     'image1', 'image2',
     'trial_type', 'category',
-    'match_key', 'response', 'rt', 'correct'
+    'match_key', 'correct_key', 'response', 'rt', 'correct'
   ];
   let _csvToSave = '';
 
@@ -217,7 +217,7 @@ function buildTimeline(jsPsych, trials, participantId, seed) {
     type: jsPsychPipe,
     action: "save",
     experiment_id: DATAPIPE_EXPERIMENT_ID,
-    filename: `${participantId}_seed${seed}.csv`,
+    filename: `${participantId}.csv`,
     data_string: () => _csvToSave
   });
 
@@ -300,6 +300,9 @@ function makeTrialSequence(jsPsych, trialData, isPractice, trialNum) {
     on_finish: (data) => {
       const keyPressed = data.response;
       const correctKey = trialData.correct_response === "same" ? SAME_KEY : DIFF_KEY;
+      // jsPsych overwrites trial_type with the plugin name; reassign our value here
+      data.trial_type  = trialData.trial_type || null;
+      data.correct_key = correctKey;
       data.correct     = keyPressed === correctKey ? 1 : 0;
       responseCorrect  = data.correct === 1;
     }
@@ -387,6 +390,6 @@ window.addEventListener("load", async () => {
     response_key_config: _keyConfig
   });
 
-  const timeline = buildTimeline(jsPsych, trials, participantId, seed);
+  const timeline = buildTimeline(jsPsych, trials, participantId);
   jsPsych.run(timeline);
 });
