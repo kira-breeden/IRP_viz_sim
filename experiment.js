@@ -5,14 +5,15 @@
  * Trial flow per trial:
  *   1. Fixation cross (1000ms)
  *   2. Placeholder rectangles (500ms)
- *   3. Images appear; participant responds (z = same, / = different)
+ *   3. Images appear; participant responds (x = same, m = different)
  *   4. If incorrect: audio feedback plays
  *   5. ITI (750ms)
  *
  * URL parameters:
  *   ?subjCode=P001            — participant identifier
  *   ?seed=482910              — RNG seed for category sampling (random if omitted)
- *   ?response_key_config=0|1  — 0 (default): z=same, /=different; 1: swapped
+ *   ?response_key_config=0|1  — 0 (default): x=same, m=different; 1: swapped
+ *   ?dev=true                 — dev mode: runs only 10 trials for quick testing
  *
  * DataPipe config:
  *   Set DATAPIPE_EXPERIMENT_ID to your OSF experiment ID from pipe.jspsych.org
@@ -25,8 +26,8 @@ const FEEDBACK_AUDIO         = "stimuli/audio/buzz.wav";
 const CATEGORIES_PER_PARTICIPANT = 3;
 // Response keys — ?response_key_config=1 swaps them
 const _keyConfig = parseInt(new URLSearchParams(window.location.search).get("response_key_config") || "0");
-const SAME_KEY   = _keyConfig === 1 ? "/" : "z";   // z=same by default
-const DIFF_KEY   = _keyConfig === 1 ? "z" : "/";   // /=different by default
+const SAME_KEY   = _keyConfig === 1 ? "m" : "x";   // x=same by default
+const DIFF_KEY   = _keyConfig === 1 ? "x" : "m";   // m=different by default
 const FIXATION_DURATION      = 1000;   // ms
 const PLACEHOLDER_DURATION   = 500;    // ms
 const ITI_DURATION           = 750;    // ms
@@ -367,7 +368,9 @@ window.addEventListener("load", async () => {
   const categoryTrials     = allCategoryTrials.filter(t => selectedCategories.includes(t.category));
 
   // Combine identity + sampled category trials and shuffle with the same seed
-  const trials = seededShuffle([...identityTrials, ...categoryTrials], rng);
+  const devMode = new URLSearchParams(window.location.search).get("dev") === "true";
+  let trials = seededShuffle([...identityTrials, ...categoryTrials], rng);
+  if (devMode) trials = trials.slice(0, 10);
 
   // Init jsPsych
   const jsPsych = initJsPsych({
