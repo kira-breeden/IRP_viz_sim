@@ -10,10 +10,10 @@
  *   5. ITI (750ms)
  *
  * URL parameters:
- *   ?subjCode=P001            — participant identifier
+ *   ?subjCode=IMS_01            — participant identifier
  *   ?seed=482910              — RNG seed for category sampling (random if omitted)
  *   ?response_key_config=0|1  — 0 (default): x=same, m=different; 1: swapped
- *   ?dev=true                 — dev mode: runs only 10 trials for quick testing
+ *   ?dev=true                 — dev mode: runs only practice + 10 trials for quick testing
  *
  * DataPipe config:
  *   Set DATAPIPE_EXPERIMENT_ID to your OSF experiment ID from pipe.jspsych.org
