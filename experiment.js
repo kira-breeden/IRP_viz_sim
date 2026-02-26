@@ -24,7 +24,7 @@ const DATAPIPE_EXPERIMENT_ID = "2KZKOzOl6w2p";
 const TRIAL_LIST_DIR         = "trial_lists/";
 const FEEDBACK_AUDIO         = "stimuli/audio/buzz.wav";
 const CATEGORIES_PER_PARTICIPANT  = 3;
-const PRACTICE_TRIALS_PER_TYPE   = 10;  // same + different each
+const PRACTICE_TRIALS_PER_TYPE   = 8;   // same + different each
 // Response keys — ?response_key_config=1 swaps them
 const _keyConfig = parseInt(new URLSearchParams(window.location.search).get("response_key_config") || "0");
 const SAME_KEY   = _keyConfig === 1 ? "m" : "x";   // x=same by default
@@ -274,8 +274,22 @@ function buildTimeline(jsPsych, trials, practiceTrials, participantId) {
 
 
   // ── 5. MAIN TRIALS ─────────────────────────────────────────────────────────
+  // A break screen is inserted after every 75 trials (but not after the last).
+  const BREAK_INTERVAL = 75;
   trials.forEach((trial, i) => {
     timeline.push(...makeTrialSequence(jsPsych, trial, false, i + 1));
+    if ((i + 1) % BREAK_INTERVAL === 0 && i + 1 < trials.length) {
+      timeline.push({
+        type: jsPsychHtmlKeyboardResponse,
+        stimulus: `
+          <div class="instructions-box">
+            <h2>TIME FOR A BREAK</h2>
+            <p>Take a moment to rest your eyes, stretch your hands, or whatever you need.</p>
+            <p>When you are ready to keep going, place your hands back on the keyboard and press any key.</p>
+          </div>`,
+        choices: "ALL_KEYS"
+      });
+    }
   });
 
 
@@ -481,8 +495,8 @@ window.addEventListener("load", async () => {
 
   // Init jsPsych
   const jsPsych = initJsPsych({
-    show_progress_bar: true,
-    message_progress_bar: "Progress",
+    // show_progress_bar: true,
+    // message_progress_bar: "Progress",
     on_finish: () => {
       jsPsych.data.displayData("csv");
     }
