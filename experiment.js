@@ -248,6 +248,25 @@ function buildTimeline(jsPsych, trials, practiceTrials, participantId) {
   });
 
 
+  // ── 3b. START PAGE (participant advances) ──────────────────────────────────
+  timeline.push({
+    type: jsPsychHtmlKeyboardResponse,
+    stimulus: `
+      <div class="instructions-box">
+        <h2>READY TO BEGIN</h2>
+        <p>After the door is closed and the researcher is out of the room, press any key to begin the practice trials.</p>
+        <p>Remember:</p>
+        <div class="key-demo">
+          <span class="key-label">${SAME_KEY.toUpperCase()}</span> &nbsp;=&nbsp; SAME
+          &nbsp;&nbsp;&nbsp;&nbsp;
+          <span class="key-label">${DIFF_KEY.toUpperCase()}</span> &nbsp;=&nbsp; DIFFERENT
+        </div>
+        <div class="continue-prompt">Press any key to begin.</div>
+      </div>`,
+    choices: "ALL_KEYS"
+  });
+
+
   // ── 4. PRACTICE TRIALS ─────────────────────────────────────────────────────
   // 20 seed-sampled trials from practice_trials.csv (10 same + 10 different).
   practiceTrials.forEach(pt => {
