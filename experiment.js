@@ -349,12 +349,13 @@ function makeTrialSequence(jsPsych, trialData, isPractice, trialNum) {
     response_ends_trial: false
   });
 
-  // 2. Placeholders
+  // 2. Placeholders + fixation (between boxes)
   seq.push({
     type: jsPsychHtmlKeyboardResponse,
     stimulus: `
       <div class="stimulus-container">
         <div class="img-placeholder"></div>
+        <div id="fixation">+</div>
         <div class="img-placeholder"></div>
       </div>`,
     choices: "NO_KEYS",
@@ -362,7 +363,7 @@ function makeTrialSequence(jsPsych, trialData, isPractice, trialNum) {
     response_ends_trial: false
   });
 
-  // 3. Stimulus + response
+  // 3. Stimulus + response + fixation (between boxes)
   seq.push({
     type: jsPsychHtmlKeyboardResponse,
     stimulus: () => `
@@ -370,6 +371,7 @@ function makeTrialSequence(jsPsych, trialData, isPractice, trialNum) {
         <div class="img-wrapper">
           <img src="${leftImg}" alt="left image"/>
         </div>
+        <div id="fixation">+</div>
         <div class="img-wrapper">
           <img src="${rightImg}" alt="right image"/>
         </div>
