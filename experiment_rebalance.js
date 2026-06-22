@@ -487,11 +487,11 @@ window.addEventListener("load", async () => {
   try {
     const [idResp, catResp, pracResp] = await Promise.all([
       fetch(`${TRIAL_LIST_DIR}identity_trials.csv`),
-      fetch(`${TRIAL_LIST_DIR}category_trials.csv`),
+      fetch(`${TRIAL_LIST_DIR}category_trials_all.csv`),
       fetch(`${TRIAL_LIST_DIR}practice_trials.csv`)
     ]);
     if (!idResp.ok)   throw new Error(`identity_trials.csv: HTTP ${idResp.status}`);
-    if (!catResp.ok)  throw new Error(`category_trials.csv: HTTP ${catResp.status}`);
+    if (!catResp.ok)  throw new Error(`category_trials_all.csv: HTTP ${catResp.status}`);
     if (!pracResp.ok) throw new Error(`practice_trials.csv: HTTP ${pracResp.status}`);
     identityTrials    = parseCSV(await idResp.text());
     allCategoryTrials = parseCSV(await catResp.text());
