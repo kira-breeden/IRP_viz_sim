@@ -11,7 +11,7 @@
  *
  * URL parameters:
  *   ?subjCode=IMS_01            — participant identifier
- *   ?categories=cat1|cat2|cat3 — pipe-separated list of exactly 3 categories to use
+ *   ?categories=cat1,cat2,cat3 — comma-separated list of exactly 3 categories to use
  *                                 (from counterbalancing.csv batch plan); falls back
  *                                 to seed-based random selection if omitted
  *   ?seed=482910                — RNG seed for trial order / practice sampling
@@ -54,14 +54,14 @@ function getSeed() {
 }
 
 /**
- * Read pre-assigned categories from URL ?categories=cat1|cat2|cat3.
+ * Read pre-assigned categories from URL ?categories=cat1,cat2,cat3.
  * Returns an array of 3 category strings, or null if the param is absent.
- * Use this for counterbalanced Prolific batches; falls back to random if null.
+ * Comma separator is used because | gets percent-encoded to %7C in some browsers.
  */
 function getAssignedCategories() {
   const param = new URLSearchParams(window.location.search).get("categories");
   if (!param) return null;
-  return param.split("|").map(c => c.trim()).filter(Boolean);
+  return param.split(",").map(c => c.trim()).filter(Boolean);
 }
 
 /**
